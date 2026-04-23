@@ -40,14 +40,12 @@ from src.visualization.plots import (  # noqa: E402
     plot_wordcloud, analyze_misclassifications, print_misclassified_samples
 )
 
-# === Configuration ===
 DEFAULT_DATA_PATH: str = 'data/raw/spam.csv'
 DEFAULT_OUTPUT_DIR: str = 'artifacts'
 DEFAULT_LOG_FILE: str = 'logs/training.log'
 DEFAULT_RANDOM_STATE: int = 42
 
 
-# === Argument Validators ===
 def prob_type(value: str) -> float:
     """Validate probability value in (0, 1)."""
     fval = float(value)
@@ -68,7 +66,6 @@ def positive_int(value: str) -> int:
     return ivalue
 
 
-# === Logging Setup ===
 def setup_logging(log_file: str, level: int = logging.INFO) -> None:
     """
     Configure root logging to file and console (idempotent).
@@ -104,7 +101,6 @@ def setup_logging(log_file: str, level: int = logging.INFO) -> None:
     root.addHandler(ch)
 
 
-# === Argument Parsing ===
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """
     Parse command-line arguments.
@@ -175,7 +171,6 @@ Examples:
     return parser.parse_args(argv)
 
 
-# === Main Pipeline ===
 def main(argv: Optional[list[str]] = None) -> int:
     """
     Execute the full training pipeline.
@@ -211,7 +206,6 @@ def main(argv: Optional[list[str]] = None) -> int:
 
         # === 2. Feature extraction ===
         logger.info("Step 2/6: Vectorizing text...")
-        # ← Убран random_state: векторизаторы sklearn его не принимают
         vectorizer, X_train = fit_vectorizer(
             X_train_text.tolist(),
             method=args.vectorizer,
@@ -255,7 +249,6 @@ def main(argv: Optional[list[str]] = None) -> int:
         with open(metrics_path, 'w', encoding='utf-8') as f:
             json.dump(metrics, f, indent=2)
 
-        # ← Опционально: сохранение семпла предсказаний (можно вынести за флаг)
         sample_df = pd.DataFrame({
             'text': X_test_text.iloc[:100].tolist(),
             'label': y_test.iloc[:100].tolist(),
@@ -302,7 +295,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             logger.info("Plots saved to %s/", plots_dir)
 
         # === Summary ===
-        logger.info("✅ Training pipeline completed successfully!")
+        logger.info("Training pipeline completed successfully!")
         logger.info(
             "Test metrics: F1=%.3f, AUC=%s",
             metrics['f1_score'],

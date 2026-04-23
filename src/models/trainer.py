@@ -57,21 +57,29 @@ def create_model(
 
     match model_type:
         case 'naive_bayes':
+            # MultinomialNB is deterministic and doesn't accept random_state
+            # Filter out model-incompatible kwargs to avoid TypeError
+            nb_kwargs = {
+                k: v for k, v in kwargs.items() if k != 'random_state'
+            }
             config = {
                 'alpha': NB_DEFAULT_ALPHA,
                 'fit_prior': NB_DEFAULT_FIT_PRIOR,
-                **kwargs
+                **nb_kwargs  # ← filtered kwargs
             }
             return MultinomialNB(**config)
+
         case 'logistic_regression':
+            # LogisticRegression uses random_state for reproducibility
             config = {
                 'max_iter': LR_DEFAULT_MAX_ITER,
                 'random_state': DEFAULT_RANDOM_STATE,
                 'class_weight': LR_DEFAULT_CLASS_WEIGHT,
                 'n_jobs': LR_DEFAULT_N_JOBS,
-                **kwargs
+                **kwargs  # ← all kwargs passed through
             }
             return LogisticRegression(**config)
+
         case _:
             raise ValueError(
                 f"Unsupported model type: '{model_type}'. "

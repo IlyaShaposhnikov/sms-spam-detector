@@ -36,8 +36,13 @@ env/
 .settings/
 
 data/raw/*.csv
+data/raw/*.parquet
 data/processed/*.csv
+data/processed/*.parquet
 !data/.gitkeep
+*.png
+!docs/*.png
+!README_files/*.png 
 
 models/*.pkl
 models/*.joblib
