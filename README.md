@@ -158,6 +158,8 @@ With default settings (`max_features=2000`, `test_size=0.33`):
 *Test set: 1,839 samples | F1=0.946 | AUC=0.980*
 
 ### Word Clouds
+| Spam | Ham |
+|---------------|---------------------|
 | ![Spam Words](docs/wordcloud_spam.png) | ![Ham Words](docs/wordcloud_ham.png) |
 
 > Larger words = higher frequency in the corpus.
