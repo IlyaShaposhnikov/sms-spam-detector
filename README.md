@@ -6,13 +6,13 @@ Machine learning project for binary classification of SMS messages as spam or ha
 
 ## Features
 
-- **Modular architecture**: Clean separation of data, features, models, evaluation, visualization
 - **Multiple models**: Naive Bayes (default) and Logistic Regression support
 - **Flexible vectorization**: CountVectorizer or TfidfVectorizer with configurable parameters
-- **Production-ready patterns**: Model/vectorizer persistence, structured logging, error handling
 - **CLI interface**: Easy training with command-line arguments
 - **Comprehensive evaluation**: Accuracy, F1, Precision, Recall, ROC-AUC + confusion matrix
 - **Interpretability**: Word clouds and misclassification analysis
+- **Production-ready patterns**: Model/vectorizer persistence, structured logging, error handling
+- **Modular architecture**: Clean separation of data, features, models, evaluation, visualization
 
 ## Quick Start
 
@@ -52,35 +52,61 @@ python scripts/train.py \
   --output-dir my_experiment
 ```
 
-### 4. Check results
-```bash
-# View metrics
-cat artifacts/metrics_*.json
+## Advanced Usage
 
-# View sample predictions
-head artifacts/sample_predictions_*.csv
+### Save processed data
 
-# Open plots (if generated)
-open artifacts/plots/confusion_matrix_*.png
+If you want to cache preprocessed data for faster retraining or experimentation:
+
+```python
+from src.data.loader import load_spam_data, save_processed_data
+
+# Load and preprocess
+df = load_spam_data('data/raw/spam.csv')
+# ... your custom preprocessing here ...
+
+# Save in CSV or Parquet format
+save_processed_data(df, 'data/processed/cleaned.csv', file_format='csv')
+# or
+save_processed_data(df, 'data/processed/cleaned.parquet', file_format='parquet')
 ```
+
+Load it later without re-parsing the raw file:
+
+```python
+import pandas as pd
+
+# For CSV
+df = pd.read_csv('data/processed/cleaned.csv')
+
+# For Parquet (requires pyarrow or fastparquet)
+df = pd.read_parquet('data/processed/cleaned.parquet')
+```
+
+> **Why use this?**  
+> - Speed up iterative development by skipping repeated I/O and cleaning  
+> - Store intermediate results after custom preprocessing (e.g., lemmatization, feature engineering)  
+> - Parquet format offers better compression and faster loading for large datasets
 
 ## Project Structure
 
 ```
 sms-spam-detector/
-├── scripts/
-│   └── train.py          # Main training CLI
 ├── src/
 │   ├── data/             # Data loading module
 │   ├── features/         # Text vectorization
 │   ├── models/           # Model training & prediction
 │   ├── evaluation/       # Metrics & confusion matrix
 │   └── visualization/    # WordCloud & error analysis
+├── scripts/
+│   └── train.py          # Main training CLI
 ├── data/
 │   ├── raw/              # Raw datasets (gitignored)
 │   └── processed/        # Processed data (gitignored)
 ├── artifacts/            # Saved models, metrics, plots (gitignored)
 ├── logs/                 # Training logs (gitignored)
+├── docs/                 # README images
+├── .gitignore
 ├── requirements.txt      # Python dependencies
 ├── README.md             # Project documentation (English)
 └── README.ru.md          # Project documentation (Russian)
@@ -128,11 +154,10 @@ With default settings (`max_features=2000`, `test_size=0.33`):
 
 ### Confusion Matrix
 ![Confusion Matrix](docs/confusion_matrix.png)
+
 *Test set: 1,839 samples | F1=0.946 | AUC=0.980*
 
 ### Word Clouds
-| Spam Messages | Ham Messages |
-|--------------|--------------|
 | ![Spam Words](docs/wordcloud_spam.png) | ![Ham Words](docs/wordcloud_ham.png) |
 
 > Larger words = higher frequency in the corpus.
