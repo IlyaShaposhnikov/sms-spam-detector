@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
+    # sklearn's native plotting API — preferred over seaborn for compatibility
     ConfusionMatrixDisplay,
     f1_score,
     precision_score,
@@ -26,9 +27,10 @@ MetricDict = dict[str, float]
 
 # === Configuration constants ===
 DEFAULT_FIGSIZE: tuple[int, int] = (6, 5)
-DEFAULT_CMAP: str = 'Blues'
+DEFAULT_CMAP: str = "Blues"
 DEFAULT_DPI: int = 100
-CM_DEFAULT_LABELS: tuple[str, str] = ('ham', 'spam')
+# Ordered to match [0, 1] target encoding
+CM_DEFAULT_LABELS: tuple[str, str] = ("ham", "spam")
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +56,12 @@ def calculate_metrics(
         Input validation is delegated to sklearn metric functions,
         which raise clear errors for invalid inputs.
     """
-    # Compute core metrics
+    # Compute core classification metrics
     metrics: MetricDict = {
-        'accuracy': float(accuracy_score(y_true, y_pred)),
-        'f1_score': float(f1_score(y_true, y_pred)),
-        'precision': float(precision_score(y_true, y_pred)),
-        'recall': float(recall_score(y_true, y_pred)),
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "f1_score": float(f1_score(y_true, y_pred)),
+        "precision": float(precision_score(y_true, y_pred)),
+        "recall": float(recall_score(y_true, y_pred)),
     }
 
     # Compute ROC-AUC if probabilities provided
@@ -70,18 +72,18 @@ def calculate_metrics(
                 "y_proba must be 1D array with same length as y_true"
             )
         try:
-            metrics['roc_auc'] = float(roc_auc_score(y_true, y_proba))
+            metrics["roc_auc"] = float(roc_auc_score(y_true, y_proba))
         except ValueError as e:
             logger.warning("Could not compute ROC-AUC: %s", e)
 
     # Log results
     auc_part = (
-        f", auc={metrics['roc_auc']:.3f}" if 'roc_auc' in metrics else ""
+        f", auc={metrics['roc_auc']:.3f}" if "roc_auc" in metrics else ""
     )
     logger.info(
         "Metrics: acc=%.3f, f1=%.3f, prec=%.3f, rec=%.3f%s",
-        metrics['accuracy'], metrics['f1_score'],
-        metrics['precision'], metrics['recall'], auc_part
+        metrics["accuracy"], metrics["f1_score"],
+        metrics["precision"], metrics["recall"], auc_part
     )
     return metrics
 
@@ -90,7 +92,7 @@ def plot_cm(
     y_true: NDArray,
     y_pred: NDArray,
     labels: Optional[list[str]] = None,
-    title: str = 'Confusion Matrix',
+    title: str = "Confusion Matrix",
     figsize: tuple[int, int] = DEFAULT_FIGSIZE,
     cmap: str = DEFAULT_CMAP,
     output_path: Optional[Union[str, Path]] = None,
@@ -120,6 +122,7 @@ def plot_cm(
     """
     display_labels = list(labels) if labels else list(CM_DEFAULT_LABELS)
 
+    # Exactly 2 labels required
     if len(display_labels) != 2:
         raise ValueError(
             "Expected 2 labels for binary classification, "
@@ -129,16 +132,20 @@ def plot_cm(
     # Compute confusion matrix with consistent label order [0, 1]
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
 
-    # Create and plot display using sklearn's built-in API
+    # Create display using sklearn's built-in API —
+    # preferred over manual seaborn heatmap
+    # because it handles formatting, annotations,
+    # and future sklearn changes automatically
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm, display_labels=display_labels
     )
-    disp.plot(cmap=cmap, values_format='d', colorbar=False)
+    # Show integer counts (not percentages) for direct interpretation
+    disp.plot(cmap=cmap, values_format="d", colorbar=False)
 
     # Customize appearance
     disp.ax_.set_title(title, fontsize=14, pad=20)
-    disp.ax_.set_xlabel('Predicted Label', fontsize=10)
-    disp.ax_.set_ylabel('True Label', fontsize=10)
+    disp.ax_.set_xlabel("Predicted Label", fontsize=10)
+    disp.ax_.set_ylabel("True Label", fontsize=10)
 
     # Adjust layout
     plt.tight_layout()
@@ -147,7 +154,7 @@ def plot_cm(
     if output_path:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        disp.figure_.savefig(output_path, dpi=DEFAULT_DPI, bbox_inches='tight')
+        disp.figure_.savefig(output_path, dpi=DEFAULT_DPI, bbox_inches="tight")
         logger.info("Saved confusion matrix to %s", output_path)
 
     if show_plot:
@@ -160,7 +167,7 @@ def plot_cm(
 
 def log_metrics(
     metrics: MetricDict,
-    prefix: str = 'Evaluation',
+    prefix: str = "Evaluation",
     level: int = logging.INFO,
 ) -> None:
     """

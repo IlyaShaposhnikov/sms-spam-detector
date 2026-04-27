@@ -12,21 +12,23 @@ from typing import Tuple, Literal
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# === Configuration constants ===
-DEFAULT_ENCODING: str = 'ISO-8859-1'
+# Default encoding for the original SMS Spam Collection dataset
+# (contains non-ASCII chars)
+DEFAULT_ENCODING: str = "ISO-8859-1"
 DEFAULT_TEST_SIZE: float = 0.33
 DEFAULT_RANDOM_STATE: int = 42
 
 # Column names for the processed DataFrame
-LABEL_COLUMN: str = 'label'      # 'ham' or 'spam'
-TEXT_COLUMN: str = 'text'        # SMS message content
-TARGET_COLUMN: str = 'target'    # Binary: 0 = ham, 1 = spam
+LABEL_COLUMN: str = "label"      # 'ham' or 'spam'
+TEXT_COLUMN: str = "text"        # SMS message content
+TARGET_COLUMN: str = "target"    # Binary: 0 = ham, 1 = spam
 
 # Mapping from original labels to binary targets
-LABEL_MAPPING: dict[str, int] = {'ham': 0, 'spam': 1}
+LABEL_MAPPING: dict[str, int] = {"ham": 0, "spam": 1}
 
 # Supported file formats for saving processed data
-SUPPORTED_FORMATS: tuple[str, ...] = ('csv', 'parquet')
+# CSV: universal, human-readable; Parquet: compressed, columnar, faster I/O
+SUPPORTED_FORMATS: tuple[str, ...] = ("csv", "parquet")
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +63,11 @@ def load_spam_data(
 
     # Read CSV with error handling
     try:
-        # Original dataset has columns:
-        # v1 (label), v2 (text), + possible Unnamed cols
+        # Original UCI dataset structure:
+        # Column 0 (v1): label ('ham' or 'spam')
+        # Column 1 (v2): SMS text content
+        # Columns 2+: empty/unused in the standard distribution
+        # usecols=[0, 1] avoids loading unnecessary empty columns
         df = pd.read_csv(filepath, encoding=encoding, usecols=[0, 1])
         df.columns = [LABEL_COLUMN, TEXT_COLUMN]
     except pd.errors.ParserError as e:
@@ -75,10 +80,11 @@ def load_spam_data(
             f"Encoding error reading '{filepath}'. Try a different encoding."
         )
 
-    # Create binary target variable
+    # Create binary target variable by mapping string labels to integers
     df[TARGET_COLUMN] = df[LABEL_COLUMN].map(LABEL_MAPPING)
 
     # Validate that all labels were mapped correctly
+    # Unmapped values indicate data quality issues or dataset version mismatch
     if df[TARGET_COLUMN].isna().any():
         invalid_labels = df.loc[
             df[TARGET_COLUMN].isna(), LABEL_COLUMN
@@ -88,7 +94,7 @@ def load_spam_data(
             f"Expected: {list(LABEL_MAPPING.keys())}"
         )
 
-    # Ensure target is integer type for ML compatibility
+    # Ensure target is integer type (not float/object) for ML compatibility
     df[TARGET_COLUMN] = df[TARGET_COLUMN].astype(int)
 
     logger.info(
@@ -123,9 +129,11 @@ def split_data(
     Raises:
         ValueError: If required columns are missing or test_size is invalid.
     """
+    # Guard clause: prevent silent failures on empty input
     if df.empty:
         raise ValueError("Cannot split an empty DataFrame")
 
+    # Validate that required columns exist before attempting split
     missing_cols = [
         col for col in [text_column, target_column]
         if col not in df.columns
@@ -133,11 +141,15 @@ def split_data(
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
 
+    # Validate test_size is in valid range
+    # (exclusive bounds prevent degenerate splits)
     if not 0.0 < test_size < 1.0:
         raise ValueError(
             f"test_size must be between 0.0 and 1.0, got {test_size}"
         )
 
+    # Stratification preserves the original class distribution (~13.4% spam)
+    # Critical for imbalanced datasets to ensure both splits are representative
     stratify_param = df[target_column] if stratify else None
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -155,7 +167,7 @@ def split_data(
 def save_processed_data(
     df: pd.DataFrame,
     output_path: str | Path,
-    file_format: Literal['csv', 'parquet'] = 'csv',
+    file_format: Literal["csv", "parquet"] = "csv",
 ) -> None:
     """
     Save a processed DataFrame to disk.
@@ -170,12 +182,15 @@ def save_processed_data(
         ImportError: If parquet dependencies are missing.
         OSError: If the file cannot be written.
     """
+    # Validate format early to fail fast with clear error message
     if file_format not in SUPPORTED_FORMATS:
         raise ValueError(
             f"Unsupported format: '{file_format}'. "
             f"Supported: {SUPPORTED_FORMATS}"
         )
 
+    # Warn but don't fail on empty DataFrame — may be intentional
+    # (e.g., filtered result)
     if df.empty:
         logger.warning("Saving empty DataFrame to %s", output_path)
 
@@ -183,9 +198,12 @@ def save_processed_data(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        if file_format == 'csv':
+        if file_format == "csv":
+            # index=False: exclude pandas row index for cleaner, portable CSV
             df.to_csv(output_path, index=False)
-        elif file_format == 'parquet':
+        elif file_format == "parquet":
+            # Parquet requires optional dependency (pyarrow or fastparquet)
+            # Catch ImportError to provide actionable installation hint
             try:
                 df.to_parquet(output_path, index=False)
             except ImportError as e:

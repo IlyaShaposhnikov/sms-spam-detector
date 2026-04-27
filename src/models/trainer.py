@@ -63,20 +63,28 @@ def create_model(
                 k: v for k, v in kwargs.items() if k != 'random_state'
             }
             config = {
+                # Laplace smoothing for unseen words
                 'alpha': NB_DEFAULT_ALPHA,
+                # Learn class priors from imbalanced data
                 'fit_prior': NB_DEFAULT_FIT_PRIOR,
-                **nb_kwargs  # ← filtered kwargs
+                # User overrides take precedence
+                **nb_kwargs
             }
             return MultinomialNB(**config)
 
         case 'logistic_regression':
             # LogisticRegression uses random_state for reproducibility
             config = {
+                # Ensure convergence in high-dimensional space
                 'max_iter': LR_DEFAULT_MAX_ITER,
+                # Reproducible optimization path
                 'random_state': DEFAULT_RANDOM_STATE,
+                # Handle imbalanced classes automatically
                 'class_weight': LR_DEFAULT_CLASS_WEIGHT,
+                # Parallelize across all CPU cores
                 'n_jobs': LR_DEFAULT_N_JOBS,
-                **kwargs  # ← all kwargs passed through
+                # User overrides take precedence
+                **kwargs
             }
             return LogisticRegression(**config)
 
@@ -95,7 +103,21 @@ def train_model(
 ) -> ClassifierMixin:
     """
     Train a classifier on the provided data.
-    ...
+
+    Convenience function that creates, trains, and returns a fitted model.
+
+    Args:
+        X_train: Training feature matrix (sparse or dense).
+        y_train: Training target vector (binary: 0 or 1).
+        model_type: Type of classifier to train.
+        **kwargs: Additional parameters for the classifier.
+
+    Returns:
+        Fitted classifier instance.
+
+    Raises:
+        ValueError: If data contains invalid labels
+        for binary SMS classification.
     """
     # Domain-specific validation: ensure binary labels for SMS classification
     y_array = np.asarray(y_train)
@@ -105,6 +127,7 @@ def train_model(
             f"Expected binary labels [0, 1], got: {unique_labels}"
         )
 
+    # Create model with method-specific defaults + user overrides, then fit
     model = create_model(model_type, **kwargs)
     model.fit(X_train, y_array)
 
@@ -125,7 +148,8 @@ def predict_with_proba(
 
     Note:
         For binary classification with labels [0, 1], proba[:, 1] corresponds
-        to P(spam). This assumption holds for sklearn binary classifiers.
+        to P(spam). This assumption holds for sklearn binary classifiers where
+        classes_ attribute is [0, 1] in ascending order.
 
     Args:
         model: Fitted classifier instance.
@@ -137,8 +161,10 @@ def predict_with_proba(
     Raises:
         ValueError: If model is not fitted or lacks predict_proba method.
     """
+    # Ensure model is fitted before prediction
     check_is_fitted(model)
 
+    # Not all sklearn classifiers support probability estimates
     if not hasattr(model, 'predict_proba'):
         raise ValueError(
             f"Model {type(model).__name__} does not support predict_proba."
@@ -161,18 +187,30 @@ def save_model(
 ) -> None:
     """
     Save a fitted model to disk using joblib.
-    ...
+
+    Args:
+        model: Fitted classifier instance to save.
+        filepath: Destination path for the saved file (.pkl or .joblib).
+        overwrite: Whether to overwrite existing file.
+
+    Raises:
+        FileExistsError: If file exists and overwrite=False.
+        ValueError: If model is not fitted.
+        OSError: If the file cannot be written.
     """
     filepath = Path(filepath)
 
+    # Auto-correct extension
     if filepath.suffix not in SUPPORTED_MODEL_EXTENSIONS:
         filepath = filepath.with_suffix('.joblib')
 
+    # Prevent accidental overwrites
     if filepath.exists() and not overwrite:
         raise FileExistsError(
             f"File already exists: {filepath}. Use overwrite=True to force."
         )
 
+    # Only fitted models can be used for predict/predict_proba
     try:
         check_is_fitted(model)
     except NotFittedError as e:
@@ -190,15 +228,28 @@ def save_model(
 def load_model(filepath: str | Path) -> ClassifierMixin:
     """
     Load a fitted model from disk.
-    ...
+
+    Args:
+        filepath: Path to the saved model file.
+
+    Returns:
+        Loaded classifier instance.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        NotFittedError: If the loaded model is not in fitted state.
+
     Warning:
-        Only load models from trusted sources. joblib.load() can execute
-        arbitrary code. For untrusted files, validate file integrity first.
+        Only load models from trusted sources. joblib.load() uses pickle under
+        the hood, which can execute arbitrary code during deserialization.
+        For untrusted files, validate file integrity first
+        or use a restricted unpickler.
     """
     filepath = Path(filepath)
     if not filepath.exists():
         raise FileNotFoundError(f"Model file not found: {filepath}")
 
+    # Only load model files from trusted sources
     model = joblib.load(filepath)
 
     # Ensure the loaded model is actually fitted

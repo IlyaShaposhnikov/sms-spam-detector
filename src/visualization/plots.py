@@ -19,8 +19,8 @@ from wordcloud import WordCloud, STOPWORDS
 DEFAULT_DPI: int = 100
 DEFAULT_WC_WIDTH: int = 800
 DEFAULT_WC_HEIGHT: int = 400
-DEFAULT_WC_BACKGROUND: str = 'white'
-DEFAULT_WC_COLORMAP: str = 'viridis'
+DEFAULT_WC_BACKGROUND: str = "white"
+DEFAULT_WC_COLORMAP: str = "viridis"
 WC_DEFAULT_MAX_WORDS: int = 100
 
 # Misclassification analysis defaults
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 def plot_wordcloud(
     texts: Union[list[str], pd.Series],
-    title: str = 'Word Cloud',
+    title: str = "Word Cloud",
     width: int = DEFAULT_WC_WIDTH,
     height: int = DEFAULT_WC_HEIGHT,
     background_color: str = DEFAULT_WC_BACKGROUND,
@@ -62,16 +62,19 @@ def plot_wordcloud(
     Raises:
         ValueError: If texts is empty or contains no valid content.
     """
+    # Convert pandas Series to list for uniform processing
     if isinstance(texts, pd.Series):
         texts = texts.tolist()
 
     if not texts:
         raise ValueError("Cannot create wordcloud from empty text list")
 
-    text_corpus = ' '.join(str(t).lower() for t in texts if pd.notna(t))
+    # Build corpus
+    text_corpus = " ".join(str(t).lower() for t in texts if pd.notna(t))
     if not text_corpus.strip():
         raise ValueError("No valid text content found for wordcloud")
 
+    # Generate word cloud with configured parameters
     wc = WordCloud(
         width=width,
         height=height,
@@ -80,19 +83,20 @@ def plot_wordcloud(
         max_words=max_words,
         min_font_size=10,
         random_state=42,
+        # Filter common English words (the, a, is, etc.) that add noise
         stopwords=stopwords if stopwords is not None else STOPWORDS,
     ).generate(text_corpus)
 
     plt.figure(figsize=(width / 100, height / 100), dpi=DEFAULT_DPI)
-    plt.imshow(wc, interpolation='bilinear')
-    plt.axis('off')
+    plt.imshow(wc, interpolation="bilinear")
+    plt.axis("off")
     plt.title(title, fontsize=14, pad=20)
     plt.tight_layout()
 
     if output_path:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(output_path, dpi=DEFAULT_DPI, bbox_inches='tight')
+        plt.savefig(output_path, dpi=DEFAULT_DPI, bbox_inches="tight")
         logger.info("Saved wordcloud to %s", output_path)
 
     if show_plot:
@@ -133,6 +137,7 @@ def analyze_misclassifications(
     if y_proba is not None and len(y_proba) != len(y_true):
         raise ValueError("y_proba length must match y_true length")
 
+    # Convert to numpy arrays for efficient boolean indexing
     texts_arr = (
         texts.values
         if isinstance(texts, pd.Series)
@@ -141,12 +146,18 @@ def analyze_misclassifications(
     y_true_arr = np.asarray(y_true)
     y_pred_arr = np.asarray(y_pred)
 
+    # Identify all misclassified samples
     misclassified_mask = y_true_arr != y_pred_arr
     if not np.any(misclassified_mask):
         logger.info("No misclassifications found — perfect predictions!")
-        return {'false_positives': [], 'false_negatives': []}
+        return {"false_positives": [], "false_negatives": []}
 
+    # False positives: actual ham (0) but predicted as spam (1)
+    # These are legitimate messages incorrectly blocked — high user impact
     fp_mask = (y_true_arr == 0) & (y_pred_arr == 1)
+
+    # False negatives: actual spam (1) but predicted as ham (0)
+    # These are spam messages that slipped through — security risk
     fn_mask = (y_true_arr == 1) & (y_pred_arr == 0)
 
     def _extract_samples(mask: NDArray[np.bool_]) -> list[dict]:
@@ -155,22 +166,22 @@ def analyze_misclassifications(
         for idx in indices:
             text_str = str(texts_arr[idx])
             sample = {
-                'index': int(idx),
-                'text': text_str,
-                'preview': (
-                    text_str[:preview_length] + '...'
+                "index": int(idx),
+                "text": text_str,
+                "preview": (
+                    text_str[:preview_length] + "..."
                     if len(text_str) > preview_length
                     else text_str
                 ),
             }
             if y_proba is not None:
-                sample['probability'] = float(y_proba[idx])
+                sample["probability"] = float(y_proba[idx])
             samples.append(sample)
         return samples
 
     results = {
-        'false_positives': _extract_samples(fp_mask),
-        'false_negatives': _extract_samples(fn_mask),
+        "false_positives": _extract_samples(fp_mask),
+        "false_negatives": _extract_samples(fn_mask),
     }
 
     logger.info(
@@ -191,10 +202,16 @@ def print_misclassified_samples(
     Args:
         misclassifications: Output from analyze_misclassifications().
         include_probability: Whether to show prediction probability.
+
+    Note:
+        Console output format optimized for readability during debugging:
+        - Clear section headers for FP vs FN
+        - Numbered list for easy reference
+        - Probability scores help prioritize which errors to investigate first
     """
     for category, key in [
-        ('False Positives (ham → spam)', 'false_positives'),
-        ('False Negatives (spam → ham)', 'false_negatives')
+        ("False Positives (ham → spam)", "false_positives"),
+        ("False Negatives (spam → ham)", "false_negatives")
     ]:
         samples = misclassifications.get(key, [])
         if not samples:
@@ -205,7 +222,7 @@ def print_misclassified_samples(
         for i, sample in enumerate(samples, 1):
             prob_part = (
                 f" | prob={sample['probability']:.3f}"
-                if include_probability and 'probability' in sample
+                if include_probability and "probability" in sample
                 else ""
             )
             print(f"{i}. {sample['preview']}{prob_part}")

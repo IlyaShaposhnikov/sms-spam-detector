@@ -10,31 +10,49 @@ from pathlib import Path
 from typing import Literal, Union
 
 import joblib
+# Type hint for sparse matrices (memory-efficient)
 from scipy.sparse import spmatrix
 from sklearn.exceptions import NotFittedError
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.utils.validation import check_is_fitted
 
-# === Configuration constants ===
-DEFAULT_VECTORIZER_METHOD: Literal['count', 'tfidf'] = 'count'
+# Default vectorization method: CountVectorizer is faster
+# and often sufficient for SMS
+DEFAULT_VECTORIZER_METHOD: Literal["count", "tfidf"] = "count"
+
+# N-gram range: (1, 2) captures both unigrams ('win') and bigrams ('call now')
+# Important for SMS where short phrases carry spam signals
 DEFAULT_NGRAM_RANGE: tuple[int, int] = (1, 2)
+
+# Document frequency thresholds:
+# max_df=0.95: ignore terms appearing in >95% of docs (too common, low signal)
+# min_df=2: ignore terms appearing in only 1 doc (likely noise/typos)
 DEFAULT_MAX_DF: float = 0.95
 DEFAULT_MIN_DF: int = 2
-DEFAULT_DECODE_ERROR: str = 'ignore'
-DEFAULT_STRIP_ACCENTS: str = 'unicode'
-DEFAULT_SUBLINEAR_TF: bool = True  # TF-IDF specific
 
-# File handling
-SUPPORTED_VECTORIZER_EXTENSIONS: tuple[str, ...] = ('.pkl', '.joblib')
+# Skip undecodable chars instead of crashing
+DEFAULT_DECODE_ERROR: str = "ignore"
+# Normalize accented chars (e.g., café → cafe)
+DEFAULT_STRIP_ACCENTS: str = "unicode"
 
-# Type aliases
+# TF-IDF specific: sublinear_tf applies log(1+tf) scaling
+# to reduce weight of very frequent terms
+# Helps prevent dominant terms from overshadowing rarer but informative words
+DEFAULT_SUBLINEAR_TF: bool = True
+
+# Supported file extensions for vectorizer persistence
+# .joblib is preferred: faster and more efficient
+# for numpy/scipy objects than .pkl
+SUPPORTED_VECTORIZER_EXTENSIONS: tuple[str, ...] = (".pkl", ".joblib")
+
+# Type alias for union of supported vectorizer types
 VectorizerType = Union[CountVectorizer, TfidfVectorizer]
 
 logger = logging.getLogger(__name__)
 
 
 def create_vectorizer(
-    method: Literal['count', 'tfidf'] = DEFAULT_VECTORIZER_METHOD,
+    method: Literal["count", "tfidf"] = DEFAULT_VECTORIZER_METHOD,
     **kwargs
 ) -> VectorizerType:
     """
@@ -60,17 +78,17 @@ def create_vectorizer(
     """
     # Base defaults for SMS text classification
     defaults = {
-        'decode_error': DEFAULT_DECODE_ERROR,
-        'strip_accents': DEFAULT_STRIP_ACCENTS,
-        'lowercase': True,
-        'ngram_range': DEFAULT_NGRAM_RANGE,
-        'max_df': DEFAULT_MAX_DF,
-        'min_df': DEFAULT_MIN_DF,
+        "decode_error": DEFAULT_DECODE_ERROR,
+        "strip_accents": DEFAULT_STRIP_ACCENTS,
+        "lowercase": True,
+        "ngram_range": DEFAULT_NGRAM_RANGE,
+        "max_df": DEFAULT_MAX_DF,
+        "min_df": DEFAULT_MIN_DF,
     }
 
     # TF-IDF specific defaults
-    if method == 'tfidf':
-        defaults['sublinear_tf'] = DEFAULT_SUBLINEAR_TF
+    if method == "tfidf":
+        defaults["sublinear_tf"] = DEFAULT_SUBLINEAR_TF
 
     # Merge defaults with user-provided kwargs (user kwargs take precedence)
     config = {**defaults, **kwargs}
@@ -81,9 +99,9 @@ def create_vectorizer(
     )
 
     match method:
-        case 'tfidf':
+        case "tfidf":
             return TfidfVectorizer(**config)
-        case 'count':
+        case "count":
             return CountVectorizer(**config)
         case _:
             raise ValueError(
@@ -94,7 +112,7 @@ def create_vectorizer(
 
 def fit_vectorizer(
     texts: list[str],
-    method: Literal['count', 'tfidf'] = DEFAULT_VECTORIZER_METHOD,
+    method: Literal["count", "tfidf"] = DEFAULT_VECTORIZER_METHOD,
     **kwargs
 ) -> tuple[VectorizerType, spmatrix]:
     """
@@ -146,7 +164,7 @@ def save_vectorizer(
 
     # Ensure proper extension
     if filepath.suffix not in SUPPORTED_VECTORIZER_EXTENSIONS:
-        filepath = filepath.with_suffix('.joblib')
+        filepath = filepath.with_suffix(".joblib")
 
     if filepath.exists() and not overwrite:
         raise FileExistsError(
